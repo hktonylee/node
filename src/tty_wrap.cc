@@ -40,6 +40,8 @@ class TTYWrap : StreamWrap {
     NODE_SET_PROTOTYPE_METHOD(t, "readStop", StreamWrap::ReadStop);
     NODE_SET_PROTOTYPE_METHOD(t, "write", StreamWrap::Write);
 
+    NODE_SET_PROTOTYPE_METHOD(t, "setRawMode", SetRawMode);
+
     NODE_SET_METHOD(target, "isTTY", IsTTY);
 
     target->Set(String::NewSymbol("TTY"), t->GetFunction());
@@ -51,6 +53,28 @@ class TTYWrap : StreamWrap {
     int fd = args[0]->Int32Value();
     assert(fd >= 0);
     return uv_is_tty(fd) ? v8::True() : v8::False();
+  }
+
+  static Handle<Value> SetRawMode(const Arguments& args) {
+    HandleScope scope;
+
+    assert(!args.Holder().IsEmpty());
+    assert(args.Holder()->InternalFieldCount() > 0);
+    TTYWrap* wrap =
+        static_cast<TTYWrap*>(args.Holder()->GetPointerFromInternalField(0));
+
+    if (!wrap) {
+      SetErrno(UV_EBADF);
+      return scope.Close(Integer::New(-1));
+    }
+
+    int r = uv_tty_set_mode(&wrap->handle_, args[0]->IsTrue());
+
+    if (r) {
+      SetErrno(uv_last_error(uv_default_loop()).code);
+    }
+
+    return scope.Close(Integer::New(r));
   }
 
   static Handle<Value> New(const Arguments& args) {
